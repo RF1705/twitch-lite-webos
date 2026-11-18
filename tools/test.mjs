@@ -167,6 +167,19 @@ function boot(o = {}) {
   const w = dom.window;
   const N = o.net || net(o);
   w.fetch = N.fetch;
+  // Serve bundled locale JSON for synchronous startup loading in jsdom.
+  const NativeXHR = w.XMLHttpRequest;
+  w.XMLHttpRequest = class extends NativeXHR {
+    open(method, url, async, ...args) {
+      this.__locale = /^locales\/[a-z]{2}\.json$/.test(url) ? url : null;
+      if (!this.__locale) return super.open(method, url, async, ...args);
+    }
+    send(body) {
+      if (!this.__locale) return super.send(body);
+      Object.defineProperty(this, 'status', { value: 200 });
+      Object.defineProperty(this, 'responseText', { value: fs.readFileSync(path.join(appDir, this.__locale), 'utf8') });
+    }
+  };
   // salvo que el test pida los ajustes de serie (o traiga los suyos), se parte con el bloqueo de anuncios apagado: los flujos
   // de reproducción de los tests usan el reproductor nativo (el bloqueo, activado por defecto, se prueba aparte)
   const ls = { ...(o.ls || {}) };
